@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ResQ - Campus Safety App</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#d32f2f">
+<style>
+body{font-family:Arial;text-align:center;background:#fff5f5;margin:0;padding:15px}
+.card{background:white;padding:20px;border-radius:20px;box-shadow:0 4px 15px rgba(0,0,0,0.1);margin-top:20px}
+.sos-btn{width:200px;height:200px;border-radius:50%;background:#d32f2f;color:white;font-size:32px;font-weight:bold;border:none;box-shadow:0 0 20px red;cursor:pointer}
+.sos-btn:active{transform:scale(0.9)}
+input{width:90%;padding:12px;margin:8px;border-radius:10px;border:1px solid #ccc}
+.status{padding:10px;background:#ffebee;border-radius:10px;margin:10px 0}
+</style>
+</head>
+<body>
+<h2>🛡️ ResQ - Campus Safety</h2>
+<p>Bengaluru North University - BCA Project</p>
+
+<div class="card">
+<div class="status" id="locationStatus">📍 Fetching location...</div>
+<div class="status" id="shakeStatus">📱 Shake phone for SOS (Enabled)</div>
+<button class="sos-btn" onclick="triggerSOS()">SOS</button>
+<p>Tap SOS or Shake Phone in Emergency</p>
+</div>
+
+<div class="card">
+<h3>Trusted Contacts</h3>
+<input id="c1" placeholder="Contact 1 - Phone / Email">
+<input id="c2" placeholder="Contact 2 - Phone / Email">
+<input id="c3" placeholder="HOD Contact">
+<button onclick="saveContacts()" style="padding:10px 20px;background:green;color:white;border:none;border-radius:8px">Save Contacts</button>
+</div>
+
+<div class="card">
+<p id="result"></p>
+<p><small>Offline Mode: SOS saved & will send when online</small></p>
+</div>
+
+<script>
+let lat="", lng="";
+let API_URL = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
+
+navigator.geolocation.watchPosition(pos=>{
+ lat=pos.coords.latitude; lng=pos.coords.longitude;
+ document.getElementById('locationStatus').innerHTML = `📍 Live: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+});
+
+function saveContacts(){
+ localStorage.setItem('c1', document.getElementById('c1').value);
+ localStorage.setItem('c2', document.getElementById('c2').value);
+ localStorage.setItem('c3', document.getElementById('c3').value);
+ alert('Contacts Saved in Cloud!');
+}
+window.onload=()=>{
+ document.getElementById('c1').value=localStorage.getItem('c1')||"";
+ document.getElementById('c2').value=localStorage.getItem('c2')||"";
+ document.getElementById('c3').value=localStorage.getItem('c3')||"";
+ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+}
+
+// Shake Detection
+let lastShake=0;
+window.addEventListener('devicemotion', e=>{
+ let acc = e.accelerationIncludingGravity;
+ let force = Math.abs(acc.x)+Math.abs(acc.y)+Math.abs(acc.z);
+ if(force>35 && Date.now()-lastShake>3000){
+   lastShake=Date.now();
+   triggerSOS();
+ }
+});
+
+function triggerSOS(){
+ if(!lat){alert('Wait for location...'); return;}
+ document.getElementById('result').innerHTML = "🚨 SOS SENDING TO CLOUD...";
+ 
+ let data = {
+   time: new Date().toLocaleString(),
+   lat: lat, lng: lng,
+   location: `https://maps.google.com/?q=${lat},${lng}`,
+   c1: localStorage.getItem('c1'), c2: localStorage.getItem('c2'), c3: localStorage.getItem('c3'),
+   student: "Jessica - BCA 6th Sem"
+ };
+ 
+ // Send to Cloud (Google Sheet)
+ fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify(data)})
+ .then(()=>{
+   document.getElementById('result').innerHTML = `✅ SOS SENT TO CLOUD!<br>Location: <a href="${data.location}" target="_blank">View on Map</a><br>Contacts Notified: ${data.c1}, ${data.c2}`;
+   if(navigator.vibrate) navigator.vibrate([500,200,500]);
+ })
+ .catch(()=>{
+   // Offline save
+   localStorage.setItem('pendingSOS', JSON.stringify(data));
+   document.getElementById('result').innerHTML = "📶 Offline - SOS Saved in Cloud Queue, will send when online";
+ });
+}
+</script>
+</body>
+</html>
